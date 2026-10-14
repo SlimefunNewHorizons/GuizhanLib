@@ -120,3 +120,19 @@ nexusPublishing {
         }
     }
 }
+
+// Gradle 8.13 exige declarar que las tareas que leen el jar de otro modulo dependen de el (antes fallaba la validacion de
+// dependencias implicitas en compileJava/delombok). Se derivan de las dependencias de proyecto de cada modulo.
+subprojects {
+    plugins.withId("java") {
+        dependencies { add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher:1.11.4") }
+    }
+    afterEvaluate {
+        val proyectos = configurations.flatMap { cfg -> cfg.dependencies.withType<ProjectDependency>().map { it.path } }.distinct()
+        tasks.matching { it.name in setOf("compileJava", "delombok", "javadoc", "compileTestJava") }.configureEach {
+            proyectos.forEach { ruta ->
+                project(ruta).tasks.matching { it.name in setOf("jar", "shadowJar") }.forEach { dependsOn(it) }
+            }
+        }
+    }
+}
